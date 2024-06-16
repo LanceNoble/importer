@@ -12,57 +12,33 @@ def getPath():
     return path
 
 flow = InstalledAppFlow.from_client_secrets_file(
-    "C:\Users\Lance\Desktop\client.json",
+    "C:/Users/Lance/Desktop/client.json",
     scopes=["https://www.googleapis.com/auth/youtube"]
 )
 flow.run_local_server()
 service = build('youtube', 'v3', credentials=flow.credentials)
 
-# print("getting your playlists...")
-# userPlaylists = service.playlists().list(part="id,snippet", mine=True).execute()["items"]
-# discography = dict()
-# count = 0
-# print("here are the playlists you've created: ")
-
-# for playlist in userPlaylists:
-#     count += 1
-#     print("% i. % s" % (count, playlist["snippet"]["title"]))
-#     videos = service.playlistItems().list(part="contentDetails", playlistId=playlist["id"]).execute()["items"]
-#     discography[playlist["snippet"]["title"]] = videos
-
 path = getPath()
 
-files = []
 for name in os.listdir(path):
     if not os.path.isfile(os.path.join(path, name)) or name.find("-videos.csv") == -1: continue
-    playlistProperties = dict(
-        snippet = dict(title = name[:-11]), 
-        status = dict(privacyStatus = "private")
-    )
-    service.playlists().insert(part="id", body=playlistProperties).execute()
-    # if name[:-11] not in discography:
-    #     playlistProperties = dict(
-    #         snippet = dict(title = name[:-11]), 
-    #         status = dict(privacyStatus = "private")
-    #     )
-    #     service.playlists().insert(part="snippet,status", body=playlistProperties).execute()
-    files.append(name)
-
-userPlaylists = service.playlists().list(part="id,snippet", mine=True).execute()["items"]
-discography = dict()
-count = 0
-for playlist in userPlaylists:
-    videos = service.playlistItems().list(part="contentDetails", playlistId=playlist["id"]).execute()["items"]
-    discography[playlist["snippet"]["title"]] = videos
-
-for file in files:
-    with open(os.path.join(path, file), newline='') as csvfile:
+    playlist = service.playlists().insert(part="snippet,status,id", body=dict(
+        snippet=dict(title = name[:-11]), 
+        status=dict(privacyStatus = "private")
+    )).execute()
+    with open(os.path.join(path, name), newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-
-            # insert or update
-            #service.playlistItems().update(part="contentDetails,id,snippet,status")
-            print("update playlist")
-            print(row)
+            try:
+                service.playlistItems().insert(part="snippet", body=dict(
+                    snippet=dict(
+                        playlistId=playlist["id"],
+                        resourceId=dict(
+                            kind="youtube#video",
+                            videoId=row["Video ID"]
+                        )
+                    )
+                )).execute()
+            except: continue
 
 service.close()
